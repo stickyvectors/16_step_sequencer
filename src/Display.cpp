@@ -14,12 +14,18 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 Display::Display()
 {
+  //
+}
+
+void Display::begin() {
   //config screen
   // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
   if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
     Serial.println(F("SSD1306 allocation failed"));
     for(;;); // Don't proceed, loop forever
   }
+  // splash screen
+  fillTriangle();
   //initial display state
   updateBasicInfo();
 }
@@ -67,7 +73,7 @@ void Display::updateBasicInfo() {
 
   if(_seq < 10) {
     _info[11] = '0';
-    _info[12] = char(_seq);
+    _info[12] = '0' + _seq;
   }
   else {
     char cSeq[2];
@@ -76,12 +82,25 @@ void Display::updateBasicInfo() {
     _info[12] = cSeq[1];
   }
 
-  int fraction = _div / 32;
+  int fraction = 32 / _div;
   char cDiv[2];
   itoa(fraction, cDiv, 10);
-  _info[17] = cDiv[0];
-  _info[18] = cDiv[1];
-
+  _info[18] = cDiv[0];
+  _info[19] = cDiv[1];
   display.print(_info);
   display.display();
+}
+
+void Display::fillTriangle() {
+  display.clearDisplay();
+
+  for(int16_t i=max(display.width(),display.height())/2; i>0; i-=5) {
+    // The INVERSE color is used so triangles alternate white/black
+    display.fillTriangle(
+      display.width()/2  , display.height()/2-i,
+      display.width()/2-i, display.height()/2+i,
+      display.width()/2+i, display.height()/2+i, SSD1306_INVERSE);
+    display.display();
+    delay(100);
+  }
 }
