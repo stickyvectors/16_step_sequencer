@@ -7,17 +7,22 @@ int activeSeq = 0;   // for LEDs
 int currentBeat = 0;  // for LEDs
 int stepNumber = 0;   // tick tock for clock
 
-//expressed as a pointer:
-//beatStates[y][x] = *(beatStatesPointer[y] + x);
-byte beatStates[5][16] = {{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-                          {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-                          {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-                          {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-                          {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
+//beat states
+int beatStates[5][16] = {{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+                         {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+                         {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+                         {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+                         {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
+//pointer
+int (*pBeatStates)[16];
 
-byte (*beatStatesPointer)[16] = beatStates;
+//pitches
+int pitch[16] = {792, 792, 792, 792, 792, 792, 792, 792, 792, 792, 792, 792, 792, 792, 792, 792};
+int changedPitch[16] = {0, 0, 0, 0,0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+int* pPitch = pitch;
+int* pPitchChange = changedPitch;
 
-unsigned long tempo = 200;
+unsigned long tempo = 100;
 unsigned long tempoTimer = 0; // tempo timer should reset every 1/32
 int tempoDiv[5] = {2, 2, 2, 2, 2};
 float swing[5] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
@@ -25,38 +30,46 @@ unsigned long beatTimers[5] = {0, 0, 0, 0, 0};
 int stepCounters[5] = {0, 0, 0, 0, 0};
 
 unsigned long dt = 0;
+unsigned long bt = 0;
 unsigned long lastMs = 0;
 
 //LEDs
 LedMatrix leds;
+LedMatrix *ledsPointer = &leds;
 //Display
 Display screen;
+Display *pScreen = &screen;
 //Buttons
 Buttons buttons;
 
 void setup() {
+  //assign beat states and pitch pointers
+  pBeatStates = beatStates;
+  pPitch = pitch;
+  //Serial begin
   Serial.begin(9600);
   Serial.println("~ WELCOME TO CHRIS'S SEQUENCER ~");
+  //Display
   screen.begin();
-  buttons.begin(beatStatesPointer);
+  //Buttons
+  buttons.begin(pBeatStates, ledsPointer, pScreen, pPitch, pPitchChange);
+
 }
 
 void loop() {
-  //read buttons
-  //this now updates via pointers in buttons class
-  buttons.read(beatStatesPointer);
-  //get updated beat states
-  //THIS IS A REALLY BAD WAY TO DO THIS!!!!!
-  //for(int p = 0; p < 5; p ++) {
-  //  for(int q = 0; q < 16; q ++) {
-  //    beatStates[p][q] = buttons.beatStates[p][q];
-  //  }
-  //}
+  //time stuff
   dt = millis() - lastMs;
   tempoTimer += dt;
   lastMs = millis();
+  //read buttons
+  //this now updates via pointers in buttons class
+  //but it causes us all kinds of problems with LED brightness
+  buttons.read(dt);
   //update beat timers
   for (int i = 0; i < 5; i ++) {
+    //update leds
+    leds.update();
+    //
     beatTimers[i] += dt;
   }
   //fire clock
@@ -80,7 +93,7 @@ void loop() {
           //just fire beat
           beatTimers[s] = 0;
           if(s == activeSeq) {
-            leds.step(beatStates[activeSeq], int(stepCounters[activeSeq]));
+            leds.step(pBeatStates, activeSeq, int(stepCounters[activeSeq]));
           }
         }
         else {
@@ -88,7 +101,7 @@ void loop() {
             //it's even: fire the beat immediately
             beatTimers[s] = 0;
             if(s == activeSeq) {
-              leds.step(beatStates[activeSeq], int(stepCounters[activeSeq]));
+              leds.step(pBeatStates, activeSeq, int(stepCounters[activeSeq]));
             }
           }
           else {
@@ -97,7 +110,7 @@ void loop() {
               //we've reached desired swing, fire the beat
               beatTimers[s] = 0;
               if(s == activeSeq) {
-                leds.step(beatStates[activeSeq], int(stepCounters[activeSeq]));
+                leds.step(pBeatStates, activeSeq, int(stepCounters[activeSeq]));
               }
             }
             //else { continue; }
@@ -111,7 +124,5 @@ void loop() {
       }
     }
   }
-  //update leds
-  leds.update();
   //
 } // end loop()

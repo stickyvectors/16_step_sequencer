@@ -12,8 +12,8 @@ class LedMatrix
   public:
     LedMatrix();
     void update();
-    void step(byte beatState[16], int currentBeat);
-    void switchState(byte beatState[16], int beat);
+    void step(int (*pBeatStates)[16], int activeSeq, int currentBeat);
+    void switchState(int beat, int state);
   private:
     byte _dataToSend;
     byte _ledData[4] = {0, 0, 0, 0};

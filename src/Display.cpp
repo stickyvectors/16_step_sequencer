@@ -8,9 +8,14 @@
 //screen config
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 32 // OLED display height, in pixels
-#define OLED_RESET     4 // Reset pin # (or -1 if sharing Arduino reset pin)
+#define OLED_RESET     -1 // Reset pin # (or -1 if sharing Arduino reset pin)
 #define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
+
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+const char _notes[13][3] = {{"C"}, {"C#"}, {"D"}, {"D#"},
+                      {"E"}, {"F"}, {"F#"}, {"G"},
+                      {"G#"}, {"A"}, {"A#"}, {"B"}};
 
 Display::Display()
 {
@@ -25,7 +30,7 @@ void Display::begin() {
     for(;;); // Don't proceed, loop forever
   }
   // splash screen
-  fillTriangle();
+  //fillTriangle();
   //initial display state
   updateBasicInfo();
 }
@@ -36,10 +41,19 @@ void Display::tick(unsigned long dt) {
     _stateTimer += dt;
     if(_stateTimer > 1000) {
       updateBasicInfo();
+      _stateTimer = 0;
+      _update = false;
     }
   }
 }
 
+void Display::home() {
+  display.clearDisplay();
+  display.setTextSize(2);
+  display.setCursor(0, 0);
+  display.print(_info);
+  display.display();
+}
 void Display::seq(int s) {
   _seq = s;
   updateBasicInfo();
@@ -56,9 +70,11 @@ void Display::pitch(int p) {
   char note[2];
   note[0] = _notes[r][0];
   note[1] = _notes[r][1];
+
   display.clearDisplay();
   display.setTextSize(1);
-  display.print("NOTE:");
+  display.setCursor(0, 0);
+  display.print("NOTE:    ");
   display.setTextSize(4);
   display.print(note);
   display.display();

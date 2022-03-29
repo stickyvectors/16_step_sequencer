@@ -17,18 +17,18 @@ void LedMatrix::update() {
   }
 }
 
-void LedMatrix::step(byte beatState[16], int currentBeat) {
+void LedMatrix::step(int (*pBeatStates)[16], int activeSeq, int currentBeat) {
   int lastBeat;
-  if (currentBeat == 0) { lastBeat = 15; }
-  else { lastBeat = currentBeat - 1; }
+  lastBeat = currentBeat - 1;
+  if(lastBeat < 0) { lastBeat = 15; }
   //invert whatever the state of the current beat is
-  byte inverse = ~beatState[currentBeat];
-  //set the current beat to be inverse and the last beat back to whatever it was
+  int inverse = !pBeatStates[activeSeq][currentBeat];
+  //set the current beat to be inverse and the last beat back to whatever it was before
   bitWrite(_ledData[int(currentBeat / 4)], (3 - (currentBeat % 4)), inverse);
-  bitWrite(_ledData[int(lastBeat / 4)], (3 - (lastBeat % 4)), beatState[lastBeat]);
+  bitWrite(_ledData[int(lastBeat / 4)], (3 - (lastBeat % 4)), pBeatStates[activeSeq][lastBeat]);
 }
 
-void LedMatrix::switchState(byte beatState[16], int beat) {
-  byte inverse = ~beatState[beat];
-  bitWrite(_ledData[int(beat / 4)], (3 - (beat % 4)), inverse);
+void LedMatrix::switchState(int beat, int state) {
+  unsigned long newbit = !!state;    // Also booleanize to force 0 or 1
+  _ledData[int(beat / 4)] ^= (-newbit ^ _ledData[int(beat / 4)]) & (1UL << (3 - (beat % 4)));
 }
