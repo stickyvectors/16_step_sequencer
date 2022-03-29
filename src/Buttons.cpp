@@ -59,6 +59,7 @@ void Buttons::read(unsigned long dt) {
       //just return
       return;
     }
+    else { buttonHeld = -1; }
   }
   //cycle through all buttons
   for (int i = 0; i < 16; i++) {
@@ -78,7 +79,7 @@ void Buttons::read(unsigned long dt) {
         if(digitalRead(seqButton) == LOW){
           if(_buttonState[i] == LOW) {
             if(i < 5) {
-              //(*_pScreen).seq(i);
+              (*_pScreen).seq(i);
               _activeSeq = i;
               //reset LEDs
             }
@@ -97,7 +98,6 @@ void Buttons::read(unsigned long dt) {
           //if we changed our pitch while the button was held
           //then don't light the LED or change beat state
           if(_pPitchChange[i] == 1) {
-            Serial.println("button released");
             (*_pScreen).home();
             _pPitchChange[i] = 0;
             _buttonHold[i] = 0;

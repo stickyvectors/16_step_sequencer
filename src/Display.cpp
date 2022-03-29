@@ -34,18 +34,6 @@ void Display::begin() {
   //initial display state
   updateBasicInfo();
 }
-//called every frame
-void Display::tick(unsigned long dt) {
-  if(_update){
-    //do nothing until a time has elapsed
-    _stateTimer += dt;
-    if(_stateTimer > 1000) {
-      updateBasicInfo();
-      _stateTimer = 0;
-      _update = false;
-    }
-  }
-}
 
 void Display::home() {
   display.clearDisplay();
@@ -55,8 +43,10 @@ void Display::home() {
   display.display();
 }
 void Display::seq(int s) {
-  _seq = s;
-  updateBasicInfo();
+  _seq = s + 1;
+  _info[11] = '0';
+  _info[12] = '0' + _seq;
+  home();
 }
 
 void Display::div(int d) {
@@ -74,7 +64,7 @@ void Display::pitch(int p) {
   display.clearDisplay();
   display.setTextSize(1);
   display.setCursor(0, 0);
-  display.print("NOTE:    ");
+  display.print("NOTE:  ");
   display.setTextSize(4);
   display.print(note);
   display.display();

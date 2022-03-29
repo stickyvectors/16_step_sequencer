@@ -13,7 +13,6 @@ class Display
     void seq(int seq);
     void div(int div);
     void pitch(int pitch);
-    void tick(unsigned long dt);
     void fillTriangle();
   private:
     int _seq = 1;
