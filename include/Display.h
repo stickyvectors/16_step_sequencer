@@ -12,6 +12,7 @@ class Display
     void home();
     void seq(int seq);
     void div(int div);
+    void swing(float s);
     void pitch(int pitch);
     void fillTriangle();
   private:

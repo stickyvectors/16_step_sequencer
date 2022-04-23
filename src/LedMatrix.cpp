@@ -32,3 +32,18 @@ void LedMatrix::switchState(int beat, int state) {
   unsigned long newbit = !!state;    // Also booleanize to force 0 or 1
   _ledData[int(beat / 4)] ^= (-newbit ^ _ledData[int(beat / 4)]) & (1UL << (3 - (beat % 4)));
 }
+
+void LedMatrix::switchSequence(int (*pBeatStates)[16], int activeSeq) {
+  int b = 0;
+  for(int r = 0; r < 4; r ++) {
+    for(int c = 0; c < 4; c ++) {
+      int state = pBeatStates[activeSeq][b];
+      bitWrite(_ledData[r], (3 - c % 4), state);
+      b += 1;
+    }
+    byte _dataToSend = (1 << (r + 4)) | (15 & ~_ledData[r]);
+    digitalWrite(latchPin, LOW);
+    shiftOut(dataPin, clockPin, LSBFIRST, _dataToSend);
+    digitalWrite(latchPin, HIGH);
+  }
+}

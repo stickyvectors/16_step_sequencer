@@ -9,6 +9,7 @@ class Encoder
     Encoder();
     void begin(int* pPitch, int* pPitchChange);
     void tick();
+    int getDirection();
     void readPitch(int button);
   private:
     int* _pPitch;

@@ -7,39 +7,53 @@
 #include "Encoder.h"
 
 Adafruit_MCP23X17 mcp;
+Adafruit_MCP23X17 mcp2;
 Encoder enc;
 
 #define seqButton 13
-#define swingButton 0
-#define transButton 1
+#define tempoDivButton 0
+#define swingButton 1
+#define transButton 2
 
 int buttonHeld = -1;
+int homeScreen = true;
 
 Buttons::Buttons() {
 //
 }
 
-void Buttons::begin(int (*pBeatStates)[16], LedMatrix *ledsPointer, Display* pScreen, int* pPitch, int* pPitchChange) {
+void Buttons::begin(int (*pBeatStates)[16], int* pSeq, LedMatrix *ledsPointer, Display* pScreen, int* pPitch, int* pPitchChange, int* pDiv, float* pSwing) {
+  //assign pointers
   _pBeatStates = pBeatStates;
+  _pSeq = pSeq;
   _pPitch = pPitch;
   _pPitchChange = pPitchChange;
   _pScreen = pScreen;
+  _pDiv = pDiv;
+  _pSwing = pSwing;
   //pass leds pointer to private variable
   _ledsPointer = ledsPointer;
   //begin I2C connection
   //Serial.println("MCP23017 buttons running");
-  if(!mcp.begin_I2C()) {
-    Serial.println("Button error.");
+  if(!mcp.begin_I2C(0x20)) {
+    Serial.println("MCP #1 0x20 error.");
     while (1);
   }
+  if(!mcp2.begin_I2C(0x21)) {
+    Serial.println("MCP #2 0x21 error.");
+    while (1);
+  }
+  //configure button matrix
   for (int i = 0; i < 16; i ++) {
     //config pin for input pull up
     mcp.pinMode(i, INPUT_PULLUP);
   }
-  //set up mod buttons (eventually this will be another MCP23017)
+  //set up mod buttons
   pinMode(seqButton, INPUT);
-  pinMode(swingButton, INPUT);
-  pinMode(transButton, INPUT);
+  //these on mcp #2
+  mcp2.pinMode(tempoDivButton, INPUT_PULLUP);
+  mcp2.pinMode(swingButton, INPUT_PULLUP);
+  mcp2.pinMode(transButton, INPUT_PULLUP);
   //start encoder
   enc.begin(pPitch, _pPitchChange);
 }
@@ -59,8 +73,37 @@ void Buttons::read(unsigned long dt) {
       //just return
       return;
     }
+    //we released the button, start reading buttons again
     else { buttonHeld = -1; }
   }
+  //if our tempo div button is down
+  else if (mcp2.digitalRead(tempoDivButton) == HIGH) {
+    //update encoder
+    enc.tick();
+    //change division according to direction
+    int div = _pDiv[*_pSeq] - enc.getDirection();
+    if(div > 0) {
+      _pDiv[*_pSeq] = div;
+      (*_pScreen).div(div);
+    }
+    return;
+  }
+  //if our swing button is down
+  else if (mcp2.digitalRead(swingButton) == HIGH) {
+    //update encoder
+    enc.tick();
+    //change division according to direction
+    float swing = _pSwing[*_pSeq] + (enc.getDirection() * 0.01f);
+    if(swing > 0.0f) {
+      _pSwing[*_pSeq] = swing;
+      (*_pScreen).swing(swing);
+    }
+    homeScreen = false;
+    return;
+  }
+  //no function buttons used (this is a bit lazy)
+  else if (!homeScreen) { (*_pScreen).home(); homeScreen = true; }
+
   //cycle through all buttons
   for (int i = 0; i < 16; i++) {
     int r = mcp.digitalRead(i);
@@ -80,10 +123,13 @@ void Buttons::read(unsigned long dt) {
           if(_buttonState[i] == LOW) {
             if(i < 5) {
               (*_pScreen).seq(i);
-              _activeSeq = i;
+              *_pSeq = i;
               //reset LEDs
+              (*_ledsPointer).switchSequence(_pBeatStates, *_pSeq);
             }
           }
+          //we can skip the rest
+          return;
         }
         //otherwise do the usual:
         //button down
@@ -104,9 +150,9 @@ void Buttons::read(unsigned long dt) {
           }
           else {
             //if we didn't change the pitch then turn on beat
-            int v = !_pBeatStates[_activeSeq][i];
-            _pBeatStates[_activeSeq][i] = v;
-            (*_ledsPointer).switchState(i, _pBeatStates[_activeSeq][i]);
+            int v = !_pBeatStates[*_pSeq][i];
+            _pBeatStates[*_pSeq][i] = v;
+            (*_ledsPointer).switchState(i, _pBeatStates[*_pSeq][i]);
             //finally set _buttonHold LOW
             _buttonHold[i] = 0;
           }
@@ -114,6 +160,7 @@ void Buttons::read(unsigned long dt) {
       }
     }
     _lastButtonState[i] = r;
-
+    //update our leds
+    (*_ledsPointer).update();
   }
 }

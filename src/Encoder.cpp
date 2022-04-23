@@ -51,6 +51,15 @@ void Encoder::tick() {
   lastStateA = currentStateA;
 }
 
+int Encoder::getDirection() {
+  if(pos != counter) {
+    counter = pos;
+    return dir;
+  }
+  else {
+    return 0;
+  }
+}
 void Encoder::readPitch(int button) {
   int newPos = counter;
   //if encoder turned

@@ -51,9 +51,35 @@ void Display::seq(int s) {
 
 void Display::div(int d) {
   _div = d;
-  updateBasicInfo();
+  int fraction = 32 / _div;
+
+  if(fraction == 10) {
+    fraction = 12;
+  }
+  //all other odd divisions get a bit weird
+  char cDiv[2];
+  itoa(fraction, cDiv, 10);
+  _info[18] = cDiv[0];
+  _info[19] = cDiv[1];
+  home();
 }
 
+void Display::swing(float s) {
+  int percentage = int(s * 100);
+  char cPercentage[3];
+  itoa(percentage, cPercentage, 10);
+  if(percentage < 10) {
+    cPercentage[1] = '%';
+  }
+  else {  cPercentage[2] = '%'; }
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setCursor(0, 0);
+  display.print("SWING: ");
+  display.setTextSize(4);
+  display.print(cPercentage);
+  display.display();
+}
 void Display::pitch(int p) {
   //if pitch / 33 = 12 then note = C
   int r = (p/33) % 12;
@@ -64,7 +90,7 @@ void Display::pitch(int p) {
   display.clearDisplay();
   display.setTextSize(1);
   display.setCursor(0, 0);
-  display.print("NOTE:  ");
+  display.print("NOTE: ");
   display.setTextSize(4);
   display.print(note);
   display.display();

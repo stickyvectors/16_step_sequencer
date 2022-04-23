@@ -2,8 +2,10 @@
 #include <LedMatrix.h>
 #include <Display.h>
 #include <Buttons.h>
+#include <DAC.h>
 
 int activeSeq = 0;   // for LEDs
+int* pSeq = &activeSeq;
 int currentBeat = 0;  // for LEDs
 int stepNumber = 0;   // tick tock for clock
 
@@ -16,16 +18,25 @@ int beatStates[5][16] = {{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 //pointer
 int (*pBeatStates)[16];
 
-//pitches
-int pitch[16] = {792, 792, 792, 792, 792, 792, 792, 792, 792, 792, 792, 792, 792, 792, 792, 792};
-int changedPitch[16] = {0, 0, 0, 0,0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-int* pPitch = pitch;
-int* pPitchChange = changedPitch;
+//pitches A
+int pitchA[16] = {792, 792, 792, 792, 792, 792, 792, 792, 792, 792, 792, 792, 792, 792, 792, 792};
+int changedPitchA[16] = {0, 0, 0, 0,0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+int* pPitchA = pitchA;
+int* pPitchChangeA = changedPitchA;
+//pitches B
+int pitchB[16] = {792, 792, 792, 792, 792, 792, 792, 792, 792, 792, 792, 792, 792, 792, 792, 792};
+int changedPitchB[16] = {0, 0, 0, 0,0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+int* pPitchB = pitchB;
+int* pPitchChangeB = changedPitchB;
 
 unsigned long tempo = 100;
 unsigned long tempoTimer = 0; // tempo timer should reset every 1/32
 int tempoDiv[5] = {2, 2, 2, 2, 2};
+int* pDiv = tempoDiv;
+
 float swing[5] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+float* pSwing = swing;
+
 unsigned long beatTimers[5] = {0, 0, 0, 0, 0};
 int stepCounters[5] = {0, 0, 0, 0, 0};
 
@@ -41,19 +52,22 @@ Display screen;
 Display *pScreen = &screen;
 //Buttons
 Buttons buttons;
+//DACs
+DAC dacA;
+DAC dacB;
 
 void setup() {
   //assign beat states and pitch pointers
   pBeatStates = beatStates;
-  pPitch = pitch;
   //Serial begin
   Serial.begin(9600);
   Serial.println("~ WELCOME TO CHRIS'S SEQUENCER ~");
   //Display
   screen.begin();
   //Buttons
-  buttons.begin(pBeatStates, ledsPointer, pScreen, pPitch, pPitchChange);
-
+  buttons.begin(pBeatStates, pSeq, ledsPointer, pScreen, pPitchA, pPitchChangeA, pDiv, pSwing);
+  dacA.begin(pBeatStates, pPitchA, 0x60);
+  dacB.begin(pBeatStates, pPitchB, 0x61);
 }
 
 void loop() {
@@ -95,6 +109,10 @@ void loop() {
           if(s == activeSeq) {
             leds.step(pBeatStates, activeSeq, int(stepCounters[activeSeq]));
           }
+          //only fire dac for first sequence
+          if(s == 0) {
+            dacA.updatePitch(stepCounters[activeSeq]);
+          }
         }
         else {
           if(stepCounters[s] % 2 == 0) {
@@ -102,6 +120,10 @@ void loop() {
             beatTimers[s] = 0;
             if(s == activeSeq) {
               leds.step(pBeatStates, activeSeq, int(stepCounters[activeSeq]));
+            }
+            //only fire dac for first sequence
+            if(s == 0) {
+              dacA.updatePitch(stepCounters[activeSeq]);
             }
           }
           else {
@@ -112,8 +134,12 @@ void loop() {
               if(s == activeSeq) {
                 leds.step(pBeatStates, activeSeq, int(stepCounters[activeSeq]));
               }
+              //only fire dac for first sequence
+              if(s == 0) {
+                dacA.updatePitch(stepCounters[activeSeq]);
+              }
             }
-            //else { continue; }
+            else { continue; }
           }
         }
         stepCounters[s] += 1;
