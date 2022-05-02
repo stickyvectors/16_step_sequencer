@@ -2,6 +2,7 @@
 #define LedMatrix_h
 
 #include "Arduino.h"
+#include "BeatData.h"
 
 #define latchPin 6
 #define clockPin 7
@@ -10,12 +11,13 @@
 class LedMatrix
 {
   public:
-    LedMatrix();
+    LedMatrix(BeatData *d);
     void update();
-    void step(int (*pBeatStates)[16], int activeSeq, int currentBeat);
+    void step();
     void switchState(int beat, int state);
-    void switchSequence(int (*pBeatStates)[16], int activeSeq);
+    void switchSequence();
   private:
+    BeatData *_dPtr;
     byte _dataToSend;
     byte _ledData[4] = {0, 0, 0, 0};
 };

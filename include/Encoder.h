@@ -7,12 +7,10 @@ class Encoder
 {
   public:
     Encoder();
-    void begin(int* pPitch, int* pPitchChange);
+    void begin();
     void tick();
     int getDirection();
     void readPitch(int button);
   private:
-    int* _pPitch;
-    int* _pPitchChange;
 };
 #endif

@@ -1,8 +1,11 @@
 #include "Arduino.h"
 #include "Encoder.h"
+#include "BeatData.h"
 
 #define encA 9
 #define encB 10
+
+extern BeatData beatData;
 
 int counter = 0;
 int dir;
@@ -15,9 +18,7 @@ Encoder::Encoder() {
   //
 }
 
-void Encoder::begin(int* pPitch, int* pPitchChange) {
-  _pPitch = pPitch;
-  _pPitchChange = pPitchChange;
+void Encoder::begin() {
   //pin modes
   pinMode(encA, INPUT_PULLUP);
   pinMode(encB, INPUT_PULLUP);
@@ -65,9 +66,9 @@ void Encoder::readPitch(int button) {
   //if encoder turned
   if(pos != newPos) {
     int pChange = ((newPos - pos) * 33);
-    if(_pPitch[button] + pChange > -1 && _pPitch[button] + pChange < 4096) {
-      _pPitch[button] += pChange;
-      _pPitchChange[button] = 1;
+    if(beatData.pitch[beatData.activeSeq][button] + pChange > -1 && beatData.pitch[beatData.activeSeq][button] + pChange < 4096) {
+      beatData.pitch[beatData.activeSeq][button] += pChange;
+      beatData.changedPitch[beatData.activeSeq][button] = 1;
     }
     pos = newPos;
   }

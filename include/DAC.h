@@ -7,11 +7,10 @@ class DAC
 {
   public:
     DAC();
-    void begin(int (*pBeatStates)[16], int* pPitch, unsigned char addr);
+    void begin(int dacNum, unsigned char addr);
     void updatePitch(int beat);
   private:
-    int (*_pBeatStates)[16];
-    int* _pPitch;
+    int _dacNum;
     int _semitone = 33;
 };
 #endif

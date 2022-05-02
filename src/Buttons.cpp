@@ -2,14 +2,18 @@
 #include "Buttons.h"
 
 #include <Adafruit_MCP23X17.h>
+#include "BeatData.h"
 #include "LedMatrix.h"
 #include "Display.h"
 #include "Encoder.h"
+
+extern BeatData beatData;
 
 Adafruit_MCP23X17 mcp;
 Adafruit_MCP23X17 mcp2;
 Encoder enc;
 
+#define INT_PIN 3
 #define seqButton 13
 #define tempoDivButton 0
 #define swingButton 1
@@ -22,31 +26,29 @@ Buttons::Buttons() {
 //
 }
 
-void Buttons::begin(int (*pBeatStates)[16], int* pSeq, LedMatrix *ledsPointer, Display* pScreen, int* pPitch, int* pPitchChange, int* pDiv, float* pSwing) {
-  //assign pointers
-  _pBeatStates = pBeatStates;
-  _pSeq = pSeq;
-  _pPitch = pPitch;
-  _pPitchChange = pPitchChange;
-  _pScreen = pScreen;
-  _pDiv = pDiv;
-  _pSwing = pSwing;
+void Buttons::begin(LedMatrix *ledsPointer, Display* pScreen) {
   //pass leds pointer to private variable
   _ledsPointer = ledsPointer;
-  //begin I2C connection
-  //Serial.println("MCP23017 buttons running");
+
   if(!mcp.begin_I2C(0x20)) {
     Serial.println("MCP #1 0x20 error.");
     while (1);
   }
+
   if(!mcp2.begin_I2C(0x21)) {
     Serial.println("MCP #2 0x21 error.");
     while (1);
   }
+
+  //configure interrupts
+  pinMode(INT_PIN, INPUT);
+  mcp.setupInterrupts(true, false, LOW);
   //configure button matrix
   for (int i = 0; i < 16; i ++) {
     //config pin for input pull up
     mcp.pinMode(i, INPUT_PULLUP);
+    //attach interrupt
+    mcp.setupInterruptPin(i, LOW);
   }
   //set up mod buttons
   pinMode(seqButton, INPUT);
@@ -55,112 +57,106 @@ void Buttons::begin(int (*pBeatStates)[16], int* pSeq, LedMatrix *ledsPointer, D
   mcp2.pinMode(swingButton, INPUT_PULLUP);
   mcp2.pinMode(transButton, INPUT_PULLUP);
   //start encoder
-  enc.begin(pPitch, _pPitchChange);
+  enc.begin();
 }
 //__attribute__((optimize("O0")))
 void Buttons::read(unsigned long dt) {
-  //if a button was already held, just read pitch
-  if(buttonHeld >= 0) {
-    //update encoder
-    enc.tick();
-    enc.readPitch(buttonHeld);
-    if(_pPitchChange[buttonHeld] == 1) {
-      (*_pScreen).pitch(_pPitch[buttonHeld]);
+  //if we received an interrupt:
+  if(!digitalRead(INT_PIN)) {
+    int btn = mcp.getLastInterruptPin();
+    int r = mcp.digitalRead(btn);
+    //debounce
+    //if we get new state before debounce timeout (and we aren't just holding it down)
+    //reset timeout
+    if(r != _lastButtonState[btn] && _buttonHold[btn] == 0) {
+      _lastdbTime[btn] = 0;
     }
-    //also check for a button release
-    int r = mcp.digitalRead(buttonHeld);
-    if(r == LOW) {
-      //just return
-      return;
-    }
-    //we released the button, start reading buttons again
-    else { buttonHeld = -1; }
-  }
-  //if our tempo div button is down
-  else if (mcp2.digitalRead(tempoDivButton) == HIGH) {
-    //update encoder
-    enc.tick();
-    //change division according to direction
-    int div = _pDiv[*_pSeq] - enc.getDirection();
-    if(div > 0) {
-      _pDiv[*_pSeq] = div;
-      (*_pScreen).div(div);
-    }
-    return;
-  }
-  //if our swing button is down
-  else if (mcp2.digitalRead(swingButton) == HIGH) {
-    //update encoder
-    enc.tick();
-    //change division according to direction
-    float swing = _pSwing[*_pSeq] + (enc.getDirection() * 0.01f);
-    if(swing > 0.0f) {
-      _pSwing[*_pSeq] = swing;
-      (*_pScreen).swing(swing);
-    }
-    homeScreen = false;
-    return;
-  }
-  //no function buttons used (this is a bit lazy)
-  else if (!homeScreen) { (*_pScreen).home(); homeScreen = true; }
+    //otherwise, increment timer
+    else { _lastdbTime[btn] += dt; _lastButtonState[btn] = r; }
 
-  //cycle through all buttons
-  for (int i = 0; i < 16; i++) {
-    int r = mcp.digitalRead(i);
-    //if we get a new button state before debounce, reset
-    if(r != _lastButtonState[i] && _buttonHold[i] == 0) {
-      _lastdbTime[i] = 0;
-    }
-    else { _lastdbTime[i] += dt; _lastButtonState[i] = r; } //increment timer
-    //if our debounce time has passed and it's a new state:
-    //it's a genuine press
-    if((_lastdbTime[i]) > _dbDelay) {
-      //if the state changed OR our button was already held do stuff
-      if(r != _buttonState[i] || _buttonHold[i] == 1) {
-        _buttonState[i] = r;
-        //if our SEQ button is also down, switch seq instead
-        if(digitalRead(seqButton) == LOW){
-          if(_buttonState[i] == LOW) {
-            if(i < 5) {
-              (*_pScreen).seq(i);
-              *_pSeq = i;
-              //reset LEDs
-              (*_ledsPointer).switchSequence(_pBeatStates, *_pSeq);
-            }
-          }
-          //we can skip the rest
-          return;
+    //if our debounce time has passed and it's a new state,
+    //then it's a genuine press
+    if((_lastdbTime[btn]) > _dbDelay) {
+      //just a press
+      if(r != _buttonState[btn]) {
+        //if SEQ button held, switch
+
+        //if button LOW, then it's held
+        if(_buttonState[btn] == LOW) {
+          _buttonHold[btn] = 1;
+          buttonHeld = btn;
+          //
         }
-        //otherwise do the usual:
-        //button down
-        else if (_buttonState[i] == LOW) {
-          //button held
-          _buttonHold[i] = 1;
-          buttonHeld = i;
-          // we can read pitch knob
-        }
-        //button up
-        else if (_buttonState[i] == HIGH) {
-          //if we changed our pitch while the button was held
+        //if button HIGH, then it's been released
+        else if (_buttonState[btn] == HIGH) {
+          _buttonHold[btn] = 0;
+          //if we changed our pitch while button was down
           //then don't light the LED or change beat state
-          if(_pPitchChange[i] == 1) {
-            (*_pScreen).home();
-            _pPitchChange[i] = 0;
-            _buttonHold[i] = 0;
+          if(beatData.changedPitch[beatData.activeSeq][btn] == 1) {
+            //return display to home screen
+            beatData.changedPitch[beatData.activeSeq][btn] = 0;
+            _buttonHold[btn] = 0;
+            buttonHeld = -1;
           }
           else {
-            //if we didn't change the pitch then turn on beat
-            int v = !_pBeatStates[*_pSeq][i];
-            _pBeatStates[*_pSeq][i] = v;
-            (*_ledsPointer).switchState(i, _pBeatStates[*_pSeq][i]);
-            //finally set _buttonHold LOW
-            _buttonHold[i] = 0;
+            //we didn't change the pitch so turn on beat
+            int v = !beatData.beatStates[beatData.activeSeq][btn];
+            beatData.beatStates[beatData.activeSeq][btn] = v;
+            (*_ledsPointer).switchState(btn, v);
           }
         }
       }
     }
-    _lastButtonState[i] = r;
-    //update our leds
-    (*_ledsPointer).update();
+    _lastButtonState[btn] = r;
   }
+  //if we already have a button held down do other stuff
+  if(buttonHeld >= 0) {
+    //update encoder
+    enc.tick();
+    //read enc data and assign to held beat
+    enc.readPitch(buttonHeld);
+    if(beatData.changedPitch[beatData.activeSeq][buttonHeld] == 1) {
+      (*_pScreen).pitch(beatData.pitch[beatData.activeSeq][buttonHeld]);
+    }
+    //do we need to check for a button release or will that be picked up by a second interrupt?
+  }
+  //if a button was already held, just read pitch
+    //update encoder
+    //also check for a button release
+    //we released the button, start reading buttons again
+
+  //if our tempo div button is down
+    //update encoder
+    //change division according to direction
+
+  //if our swing button is down
+    //update encoder
+    //change division according to direction
+
+  //no function buttons used (this is a bit lazy) return display to default
+
+  //cycle through all buttons
+    //if we get a new button state before debounce, reset
+
+      //otherwise, increment timer
+
+    //if our debounce time has passed and it's a new state:
+    //it's a genuine press
+      //if the state changed OR our button was already held do stuff
+        //if our SEQ button is also down, switch seq instead
+          //tell LEDs to switch sequence
+          //we can skip the rest
+
+        //otherwise do the usual:
+        //if button down
+          //button held
+          // we can read pitch knob
+
+        //if button up
+          //if we changed our pitch while the button was held
+          //then don't light the LED or change beat state
+            //if we didn't change the pitch then turn on beat
+            //finally set _buttonHold LOW
+
+    //updateL _lastButtonState[i]
 }
