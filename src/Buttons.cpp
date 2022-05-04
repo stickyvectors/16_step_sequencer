@@ -2,12 +2,9 @@
 #include "Buttons.h"
 
 #include <Adafruit_MCP23X17.h>
-#include "BeatData.h"
 #include "LedMatrix.h"
 #include "Display.h"
 #include "Encoder.h"
-
-extern BeatData beatData;
 
 Adafruit_MCP23X17 mcp;
 Adafruit_MCP23X17 mcp2;
@@ -22,13 +19,14 @@ Encoder enc;
 int buttonHeld = -1;
 int homeScreen = true;
 
-Buttons::Buttons() {
-//
-}
-
-void Buttons::begin(LedMatrix *ledsPointer, Display* pScreen) {
+Buttons::Buttons(BeatData *d, LedMatrix *ledsPointer, Display* pScreen) {
+  _dPtr = d;
   //pass leds pointer to private variable
   _ledsPointer = ledsPointer;
+}
+
+void Buttons::begin() {
+
 
   if(!mcp.begin_I2C(0x20)) {
     Serial.println("MCP #1 0x20 error.");
@@ -76,36 +74,37 @@ void Buttons::read(unsigned long dt) {
 
     //if our debounce time has passed and it's a new state,
     //then it's a genuine press
-    if((_lastdbTime[btn]) > _dbDelay) {
+    if((_lastdbTime[btn]) > _dbDelay || buttonHeld == btn) {
       //just a press
-      if(r != _buttonState[btn]) {
+      //if(r != _buttonState[btn]) {
         //if SEQ button held, switch
 
         //if button LOW, then it's held
-        if(_buttonState[btn] == LOW) {
+        if(r == LOW) {
           _buttonHold[btn] = 1;
           buttonHeld = btn;
           //
         }
         //if button HIGH, then it's been released
-        else if (_buttonState[btn] == HIGH) {
+        else if (r == HIGH) {
           _buttonHold[btn] = 0;
           //if we changed our pitch while button was down
           //then don't light the LED or change beat state
-          if(beatData.changedPitch[beatData.activeSeq][btn] == 1) {
+          if(_dPtr->changedPitch[_dPtr->activeSeq][btn] == 1) {
             //return display to home screen
-            beatData.changedPitch[beatData.activeSeq][btn] = 0;
-            _buttonHold[btn] = 0;
-            buttonHeld = -1;
+            _dPtr->changedPitch[_dPtr->activeSeq][btn] = 0;
+
           }
           else {
             //we didn't change the pitch so turn on beat
-            int v = !beatData.beatStates[beatData.activeSeq][btn];
-            beatData.beatStates[beatData.activeSeq][btn] = v;
+            int v = !_dPtr->beatStates[_dPtr->activeSeq][btn];
+            _dPtr->beatStates[_dPtr->activeSeq][btn] = v;
             (*_ledsPointer).switchState(btn, v);
           }
+          _buttonHold[btn] = 0;
+          buttonHeld = -1;
         }
-      }
+      //}
     }
     _lastButtonState[btn] = r;
   }
@@ -115,8 +114,8 @@ void Buttons::read(unsigned long dt) {
     enc.tick();
     //read enc data and assign to held beat
     enc.readPitch(buttonHeld);
-    if(beatData.changedPitch[beatData.activeSeq][buttonHeld] == 1) {
-      (*_pScreen).pitch(beatData.pitch[beatData.activeSeq][buttonHeld]);
+    if(_dPtr->changedPitch[_dPtr->activeSeq][buttonHeld] == 1) {
+      (*_pScreen).pitch(_dPtr->pitch[_dPtr->activeSeq][buttonHeld]);
     }
     //do we need to check for a button release or will that be picked up by a second interrupt?
   }

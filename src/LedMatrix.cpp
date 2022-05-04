@@ -19,8 +19,7 @@ void LedMatrix::update() {
 }
 
 void LedMatrix::step() {
-  int currentBeat = _dPtr->beatStates[_dPtr->activeSeq][_dPtr->stepCounter[_dPtr->activeSeq]];
-  Serial.println(currentBeat);
+  int currentBeat = _dPtr->stepCounter[_dPtr->activeSeq];
   int lastBeat;
   lastBeat = currentBeat - 1;
   if(lastBeat < 0) { lastBeat = 15; }

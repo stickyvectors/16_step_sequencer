@@ -2,15 +2,16 @@
 #define Buttons_h
 
 #include "Arduino.h"
+#include "BeatData.h"
 #include "LedMatrix.h"
 #include "Display.h"
 
 class Buttons
 {
   public:
-    Buttons();
+    Buttons(BeatData *d, LedMatrix *ledsPointer, Display* pScreen);
     //void begin(int (*pBeatStates)[16], LedMatrix *ledsPointer, int* pPitch, int* pPitchChange);
-    void begin(LedMatrix *ledsPointer, Display* pScreen);
+    void begin();
     void read(unsigned long dt);
   private:
     unsigned long _dbDelay = 25;
@@ -19,6 +20,7 @@ class Buttons
     int _buttonState[16] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
     int _buttonHold[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     int _lastButtonState[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    BeatData *_dPtr;
     LedMatrix *_ledsPointer;
     Display *_pScreen;
 };

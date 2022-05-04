@@ -51,12 +51,12 @@ BeatData *beatData = &bData;
 
 //LEDs
 LedMatrix leds(beatData);
-LedMatrix *ledsPointer = &leds;
+LedMatrix *pLEDS = &leds;
 //Display
 Display screen;
 Display *pScreen = &screen;
 //Buttons
-Buttons buttons;
+Buttons buttons(beatData, pLEDS, pScreen);
 //DACs
 DAC dacA;
 DAC dacB;
@@ -68,7 +68,7 @@ void setup() {
   //Display
   //screen.begin();
   //Buttons
-
+  buttons.begin();
   dacA.begin(0, 0x6);
   dacB.begin(1, 0x6);
 }
@@ -79,6 +79,7 @@ void loop() {
   tempoTimer += dt; //increment timer
   lastMs = millis();
   //read buttons
+  buttons.read(dt);
   for (int i = 0; i < 5; i ++) {
     //update leds
     leds.update();
@@ -96,7 +97,6 @@ void loop() {
   }
   //fire beats
   if(tempoTimer == 0){
-    Serial.println(beatData->stepCounter[0]);
     // go through all sequences and fire beats
     for (int s = 0; s < 5; s ++) {
       if (beatData->beatTimer[s] > beatData->tempoDiv[s] * tempo) {
@@ -105,7 +105,6 @@ void loop() {
         if(beatData->swing[s] == 0) {
           //just fire beat
           beatData->beatTimer[s] = 0;
-          Serial.print("fire!");
           if(s == beatData->activeSeq) {
             leds.step();
           }
