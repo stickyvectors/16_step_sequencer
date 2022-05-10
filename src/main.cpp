@@ -4,6 +4,7 @@
 #include <Buttons.h>
 #include <DAC.h>
 #include <BeatData.h>
+#include <dacTest.h>
 
 /*int activeSeq = 0;   // for LEDs
 int* pSeq = &activeSeq;
@@ -58,19 +59,20 @@ Display *pScreen = &screen;
 //Buttons
 Buttons buttons(beatData, pLEDS, pScreen);
 //DACs
-DAC dacA;
-DAC dacB;
+DAC dacA(beatData, 0, 0x60);
+DAC dacB(beatData, 1, 0x61);
 
 void setup() {
   //Serial begin
   Serial.begin(9600);
   Serial.println("~ WELCOME TO CHRIS'S SEQUENCER ~");
   //Display
-  //screen.begin();
+  screen.begin();
   //Buttons
   buttons.begin();
-  dacA.begin(0, 0x6);
-  dacB.begin(1, 0x6);
+  //DACs
+  dacA.begin();
+  dacB.begin();
 }
 
 void loop() {

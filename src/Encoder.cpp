@@ -1,11 +1,8 @@
 #include "Arduino.h"
 #include "Encoder.h"
-#include "BeatData.h"
 
 #define encA 9
 #define encB 10
-
-extern BeatData beatData;
 
 int counter = 0;
 int dir;
@@ -14,8 +11,9 @@ int pos = 0;
 int currentStateA;
 int lastStateA;
 
-Encoder::Encoder() {
-  //
+Encoder::Encoder(BeatData *d) {
+  _dPtr = d;
+  Serial.println("encoder");
 }
 
 void Encoder::begin() {
@@ -66,9 +64,9 @@ void Encoder::readPitch(int button) {
   //if encoder turned
   if(pos != newPos) {
     int pChange = ((newPos - pos) * 33);
-    if(beatData.pitch[beatData.activeSeq][button] + pChange > -1 && beatData.pitch[beatData.activeSeq][button] + pChange < 4096) {
-      beatData.pitch[beatData.activeSeq][button] += pChange;
-      beatData.changedPitch[beatData.activeSeq][button] = 1;
+    if(_dPtr->pitch[_dPtr->activeSeq][button] + pChange > -1 && _dPtr->pitch[_dPtr->activeSeq][button] + pChange < 4096) {
+      _dPtr->pitch[_dPtr->activeSeq][button] += pChange;
+      _dPtr->changedPitch[_dPtr->activeSeq][button] = 1;
     }
     pos = newPos;
   }

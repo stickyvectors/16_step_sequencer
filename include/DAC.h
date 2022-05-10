@@ -2,15 +2,18 @@
 #define DAC_h
 
 #include "Arduino.h"
+#include "BeatData.h"
 
 class DAC
 {
   public:
-    DAC();
-    void begin(int dacNum, unsigned char addr);
+    DAC(BeatData *d, int dacNum, unsigned char addr);
+    void begin();
     void updatePitch(int beat);
   private:
+    BeatData *_dPtr;
     int _dacNum;
+    unsigned char _addr;
     int _semitone = 33;
 };
 #endif

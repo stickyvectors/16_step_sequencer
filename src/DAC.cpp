@@ -2,25 +2,24 @@
 #include <Wire.h>
 #include <Adafruit_MCP4725.h>
 #include "DAC.h"
-#include "BeatData.h"
 
 Adafruit_MCP4725 dac;
 
-extern BeatData beatData;
-
 #define DAC_RESOLUTION (9)
 
-DAC::DAC() {
+DAC::DAC(BeatData *d, int dacNum, unsigned char addr) {
+  _dPtr = d;
+  _dacNum = dacNum;
+  _addr = addr;
   //
 }
 
-void DAC::begin(int dacNum, unsigned char addr) {
-  dac.begin(addr);
-  _dacNum = dacNum;
-  dac.setVoltage(beatData.pitch[dacNum][0], false);
-}
+void DAC::begin() {
+  dac.begin(_addr);
+  dac.setVoltage(_dPtr->pitch[_dacNum][0], false);
 
+}
 void DAC::updatePitch(int beat) {
-  int pitch = beatData.pitch[_dacNum][beat]; //the encoder does the math for us
+  int pitch = _dPtr->pitch[_dacNum][beat]; //the encoder does the math for us
   dac.setVoltage(pitch, false);
 }

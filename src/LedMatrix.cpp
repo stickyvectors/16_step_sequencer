@@ -7,6 +7,7 @@ LedMatrix::LedMatrix(BeatData *d) {
   pinMode(latchPin, OUTPUT);
   pinMode(clockPin, OUTPUT);
   pinMode(dataPin, OUTPUT);
+
 }
 //call this every frame
 void LedMatrix::update() {

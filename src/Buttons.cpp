@@ -8,19 +8,20 @@
 
 Adafruit_MCP23X17 mcp;
 Adafruit_MCP23X17 mcp2;
-Encoder enc;
 
 #define INT_PIN 3
 #define seqButton 13
-#define tempoDivButton 0
-#define swingButton 1
-#define transButton 2
+#define tempoDivButton 8
+#define swingButton 9
+#define transButton 10
 
 int buttonHeld = -1;
 int homeScreen = true;
 
 Buttons::Buttons(BeatData *d, LedMatrix *ledsPointer, Display* pScreen) {
   _dPtr = d;
+  Encoder enc(_dPtr);
+  _enc = &enc;
   //pass leds pointer to private variable
   _ledsPointer = ledsPointer;
 }
@@ -54,8 +55,12 @@ void Buttons::begin() {
   mcp2.pinMode(tempoDivButton, INPUT_PULLUP);
   mcp2.pinMode(swingButton, INPUT_PULLUP);
   mcp2.pinMode(transButton, INPUT_PULLUP);
+  //gates on mcp2
+  for(int i = 0; i < 6; i ++) {
+      mcp2.pinMode(i, OUTPUT);
+  }
   //start encoder
-  enc.begin();
+  _enc->begin();
 }
 //__attribute__((optimize("O0")))
 void Buttons::read(unsigned long dt) {
@@ -111,9 +116,9 @@ void Buttons::read(unsigned long dt) {
   //if we already have a button held down do other stuff
   if(buttonHeld >= 0) {
     //update encoder
-    enc.tick();
+    _enc->tick();
     //read enc data and assign to held beat
-    enc.readPitch(buttonHeld);
+    _enc->readPitch(buttonHeld);
     if(_dPtr->changedPitch[_dPtr->activeSeq][buttonHeld] == 1) {
       (*_pScreen).pitch(_dPtr->pitch[_dPtr->activeSeq][buttonHeld]);
     }
@@ -158,4 +163,8 @@ void Buttons::read(unsigned long dt) {
             //finally set _buttonHold LOW
 
     //updateL _lastButtonState[i]
+}
+
+void Buttons::fireGate(int gate) {
+  mcp2.digitalWrite(gate, HIGH);
 }
