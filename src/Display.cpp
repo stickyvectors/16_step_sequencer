@@ -20,6 +20,9 @@ const char _notes[13][3] = {{"C"}, {"C#"}, {"D"}, {"D#"},
                       {"E"}, {"F"}, {"F#"}, {"G"},
                       {"G#"}, {"A"}, {"A#"}, {"B"}};
 
+char _info[] = "SEQ: |DIV:#01  |1/16";
+
+int a = 0;
 Display::Display()
 {
   //
@@ -29,6 +32,7 @@ void Display::begin() {
   //config screen
   display.begin(&Adafruit128x32, SCREEN_ADDRESS);
   display.setFont(Adafruit5x7);
+  display.set2X();
   /*
   // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
   if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
@@ -38,35 +42,48 @@ void Display::begin() {
   // splash screen
   //fillTriangle();
   //initial display state
-  updateBasicInfo();
+  home();
+  //updateBasicInfo();
 }
 
 void Display::home() {
   display.clear();
   display.set2X();
   display.setCursor(0, 0);
-  display.print(_info);
+  for(int i = 0; i < 10; i ++){
+    char c = _info[i];
+    display.print(c);
+  }
+  display.print("\n");
+  for(int i = 10; i < 20; i ++){
+    char c = _info[i];
+    display.print(c);
+  }
+  returnHome = false;
   //display.display();
 }
 void Display::seq(int s) {
-  _seq = s + 1;
+  s += 1;
+  _seq = s;
   _info[11] = '0';
-  _info[12] = '0' + _seq;
+  _info[12] = '4';
   home();
 }
 
 void Display::div(int d) {
-  _div = d;
-  int fraction = 32 / _div;
+  int fraction = 32 / d;
 
   if(fraction == 10) {
     fraction = 12;
   }
   //all other odd divisions get a bit weird
-  char cDiv[2];
-  itoa(fraction, cDiv, 10);
+  char cDiv[21];
+  sprintf(cDiv, "%d", fraction);
   _info[18] = cDiv[0];
-  _info[19] = cDiv[1];
+  _info[19] = ' ';
+  if(fraction >= 10) {
+    _info[19] = cDiv[1];
+  }
   home();
 }
 
@@ -84,6 +101,7 @@ void Display::swing(float s) {
   display.print("SWING: ");
   display.set2X();
   display.print(cPercentage);
+  returnHome = true;
   //display.display();
 }
 void Display::pitch(int p) {
@@ -102,6 +120,7 @@ void Display::pitch(int p) {
   //display.display();
   _update = true;
   _stateTimer = 0;
+  returnHome = true;
 }
 
 void Display::updateBasicInfo() {
@@ -125,7 +144,13 @@ void Display::updateBasicInfo() {
   itoa(fraction, cDiv, 10);
   _info[18] = cDiv[0];
   _info[19] = cDiv[1];
-  display.print(_info);
+  for(int i = 0; i < 10; i ++){
+    display.print(_info[i]);
+  }
+  display.print("\n");
+  for(int i = 10; i < 20; i ++){
+    display.print(_info[i]);
+  }
   //display.display();
 }
 

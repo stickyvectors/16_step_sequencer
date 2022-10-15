@@ -3,31 +3,30 @@
 
 #include <Adafruit_MCP23X17.h>
 #include "LedMatrix.h"
-#include "Display.h"
 #include "Encoder.h"
 
 Adafruit_MCP23X17 mcp;
 Adafruit_MCP23X17 mcp2;
 
 #define INT_PIN 3
-#define seqButton 13
 #define tempoDivButton 8
 #define swingButton 9
 #define transButton 10
+#define seqButton 11
 
 int buttonHeld = -1;
 int homeScreen = true;
 
 Buttons::Buttons(BeatData *d, LedMatrix *ledsPointer, Display* pScreen) {
   _dPtr = d;
-  Encoder enc(_dPtr);
-  _enc = &enc;
   //pass leds pointer to private variable
   _ledsPointer = ledsPointer;
 }
 
 void Buttons::begin() {
 
+  Encoder enc(_dPtr);
+  _enc = &enc;
 
   if(!mcp.begin_I2C(0x20)) {
     Serial.println("MCP #1 0x20 error.");
@@ -52,6 +51,7 @@ void Buttons::begin() {
   //set up mod buttons
   pinMode(seqButton, INPUT);
   //these on mcp #2
+  mcp2.pinMode(seqButton, INPUT_PULLUP);
   mcp2.pinMode(tempoDivButton, INPUT_PULLUP);
   mcp2.pinMode(swingButton, INPUT_PULLUP);
   mcp2.pinMode(transButton, INPUT_PULLUP);
@@ -83,7 +83,17 @@ void Buttons::read(unsigned long dt) {
       //just a press
       //if(r != _buttonState[btn]) {
         //if SEQ button held, switch
-
+        if(mcp2.digitalRead(seqButton) == LOW) {
+          if(btn < 8) {
+            if(_dPtr->activeSeq != btn) {
+              _dPtr->activeSeq = btn;
+              Serial.print("seq ");
+              Serial.println(btn);
+              _ledsPointer->switchSequence();
+            }
+            return;
+          }
+        };
         //if button LOW, then it's held
         if(r == LOW) {
           _buttonHold[btn] = 1;
@@ -97,6 +107,7 @@ void Buttons::read(unsigned long dt) {
           //then don't light the LED or change beat state
           if(_dPtr->changedPitch[_dPtr->activeSeq][btn] == 1) {
             //return display to home screen
+            //_pScreen->home();
             _dPtr->changedPitch[_dPtr->activeSeq][btn] = 0;
 
           }
@@ -104,7 +115,7 @@ void Buttons::read(unsigned long dt) {
             //we didn't change the pitch so turn on beat
             int v = !_dPtr->beatStates[_dPtr->activeSeq][btn];
             _dPtr->beatStates[_dPtr->activeSeq][btn] = v;
-            (*_ledsPointer).switchState(btn, v);
+            _ledsPointer->switchState(btn, v);
           }
           _buttonHold[btn] = 0;
           buttonHeld = -1;
@@ -120,23 +131,36 @@ void Buttons::read(unsigned long dt) {
     //read enc data and assign to held beat
     _enc->readPitch(buttonHeld);
     if(_dPtr->changedPitch[_dPtr->activeSeq][buttonHeld] == 1) {
-      (*_pScreen).pitch(_dPtr->pitch[_dPtr->activeSeq][buttonHeld]);
+      //_pScreen->pitch(_dPtr->pitch[_dPtr->activeSeq][buttonHeld]);
     }
+    return;
     //do we need to check for a button release or will that be picked up by a second interrupt?
   }
-  //if a button was already held, just read pitch
-    //update encoder
-    //also check for a button release
-    //we released the button, start reading buttons again
-
   //if our tempo div button is down
+  if(mcp2.digitalRead(tempoDivButton) == HIGH) {
     //update encoder
+    _enc->tick();
+    int dir = _enc->getDirection();
     //change division according to direction
-
+    if(dir != 0) {
+      _dPtr->tempoDiv[_dPtr->activeSeq] += dir;
+    }
+    return;
+  }
   //if our swing button is down
+  else if(mcp2.digitalRead(swingButton) == HIGH) {
     //update encoder
+    _enc->tick();
+    int dir = _enc->getDirection();
     //change division according to direction
-
+    if(dir != 0) {
+      float s = _dPtr->swing[_dPtr->activeSeq] + (dir * 0.01f);
+      _dPtr->swing[_dPtr->activeSeq] = s;
+      Serial.print("swing ");
+      Serial.println(s);
+    }
+    return;
+  }
   //no function buttons used (this is a bit lazy) return display to default
 
   //cycle through all buttons
@@ -167,4 +191,8 @@ void Buttons::read(unsigned long dt) {
 
 void Buttons::fireGate(int gate) {
   mcp2.digitalWrite(gate, HIGH);
+}
+
+void Buttons::closeGate(int gate) {
+  mcp2.digitalWrite(gate, LOW);
 }

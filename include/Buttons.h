@@ -15,6 +15,7 @@ class Buttons
     void begin();
     void read(unsigned long dt);
     void fireGate(int gate);
+    void closeGate(int gate);
   private:
     unsigned long _dbDelay = 25;
     unsigned long _lastdbTime[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};

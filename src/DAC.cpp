@@ -17,7 +17,6 @@ DAC::DAC(BeatData *d, int dacNum, unsigned char addr) {
 void DAC::begin() {
   dac.begin(_addr);
   dac.setVoltage(_dPtr->pitch[_dacNum][0], false);
-
 }
 void DAC::updatePitch(int beat) {
   int pitch = _dPtr->pitch[_dacNum][beat]; //the encoder does the math for us

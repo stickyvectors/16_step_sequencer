@@ -13,7 +13,6 @@ int lastStateA;
 
 Encoder::Encoder(BeatData *d) {
   _dPtr = d;
-  Serial.println("encoder");
 }
 
 void Encoder::begin() {
@@ -64,9 +63,12 @@ void Encoder::readPitch(int button) {
   //if encoder turned
   if(pos != newPos) {
     int pChange = ((newPos - pos) * 33);
-    if(_dPtr->pitch[_dPtr->activeSeq][button] + pChange > -1 && _dPtr->pitch[_dPtr->activeSeq][button] + pChange < 4096) {
-      _dPtr->pitch[_dPtr->activeSeq][button] += pChange;
+    int pitch = _dPtr->pitch[_dPtr->activeSeq][button] + pChange;
+    if(pitch > -1 && pitch < 4096) {
+      _dPtr->pitch[_dPtr->activeSeq][button] = pitch;
       _dPtr->changedPitch[_dPtr->activeSeq][button] = 1;
+      Serial.print("pitch ");
+      Serial.println(_dPtr->pitch[_dPtr->activeSeq][button]);
     }
     pos = newPos;
   }

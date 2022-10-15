@@ -15,10 +15,10 @@ class Display
     void swing(float s);
     void pitch(int pitch);
     void fillTriangle();
+    bool returnHome = false;
   private:
     int _seq = 1;
     int _div = 2;
-    char _info[21] = "SEQ: |DIV:#01  |1/16";
     /*const char _notes[13][3] = {{"C"}, {"C#"}, {"D"}, {"D#"},
                           {"E"}, {"F"}, {"F#"}, {"G"},
                           {"G#"}, {"A"}, {"A#"}, {"B"}};*/
