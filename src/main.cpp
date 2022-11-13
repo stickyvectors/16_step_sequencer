@@ -20,10 +20,12 @@ EventDispatcher *dispatcherPtr = &dispatcher;
 
 #define tempoKnob A0
 #define clkPin 12
-unsigned long tempo = 200;
-unsigned long tempoTimer = 0; //tempo resets every 1/64
-unsigned long tempoDb = 0;
-unsigned long tempoDbtime = 50;
+int tempo = 200;
+int tempoTimer = 0; //tempo resets every 1/64
+int tempoDb = 0;
+int tempoDbtime = 50;
+int tSample = 0;
+int tEstimate = 0;
 int tickTock = 0;
 //delta time
 unsigned long dt = 0;
@@ -61,6 +63,9 @@ void setup() {
   dacB.begin();
   gates.begin();
   pinMode(clkPin, OUTPUT);
+
+  tSample = analogRead(tempoKnob)/4.3;
+  tEstimate = tSample;
   Serial.println("~WELCOME TO SEQ_MKII~");
 }
 
@@ -98,10 +103,18 @@ void loop() {
   tempoDb += dt;
   if(tempoDb > tempoDbtime) {
     //update tempo, if it got changed
-    unsigned int tRead = analogRead(tempoKnob)/4.3;
-    if (tRead > tempo * 1.1 || tRead < tempo * 0.9) {
-      tempo = tRead;
+    //exponential smoothing
+    tSample = analogRead(tempoKnob)/4.3;
+    tEstimate += (tSample - tEstimate) >> 3;
+
+    if(tEstimate != tempo) {
+      tempo = tEstimate;
+      Serial.println(tempo);
     }
+    //unsigned int tRead = analogRead(tempoKnob)/4.3;
+    //if (tRead > tempo * 1.1 || tRead < tempo * 0.9) {
+    //  tempo = tRead;
+    //}
     tempoDb = 0;
   }
 
