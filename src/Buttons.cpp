@@ -1,166 +1,219 @@
-#include "Arduino.h"
-#include "Buttons.h"
-
+#include <Arduino.h>
 #include <Adafruit_MCP23X17.h>
-#include "LedMatrix.h"
-#include "Display.h"
-#include "Encoder.h"
+#include <Buttons.h>
 
-Adafruit_MCP23X17 mcp;
-Adafruit_MCP23X17 mcp2;
-Encoder enc;
+#include <stdio.h>
 
-#define seqButton 13
-#define tempoDivButton 0
-#define swingButton 1
-#define transButton 2
+#include <Events.h>
+#include <EventQueue.h>
+#include <EventDispatcher.h>
 
-int buttonHeld = -1;
-int homeScreen = true;
+//mcp23017s
+Adafruit_MCP23X17 mcpA;
+Adafruit_MCP23X17 mcpB;
 
-Buttons::Buttons() {
-//
+#define INT_PIN_A 3 //mcp A interrupt pin
+#define INT_PIN_B 4 //mcp B interrupt pin
+#define NUM_KEYS 16
+#define KB_DEBOUNCE_COUNT 3
+
+#define tempoDivButton 8 //16
+#define resetButton 9 //for the timebeing this is used
+#define swingButton 9 //17
+#define transButton 10 //18
+#define seqButton 11 // N/a
+
+int seqBtnDown = 0;
+int tempoDivBtnDown = 0;
+int transBtnDown = 0;
+
+int encoderTurned = 0;
+
+int beatChanged = 0;
+int id;
+int seqChanged = 0;
+
+Buttons::Buttons(BeatData *d, EventQueue *q, EventDispatcher *dispatcher) {
+  _d = d;
+  _q = q;
+  _dispatcher = dispatcher;
 }
 
-void Buttons::begin(int (*pBeatStates)[16], int* pSeq, LedMatrix *ledsPointer, Display* pScreen, int* pPitch, int* pPitchChange, int* pDiv, float* pSwing) {
-  //assign pointers
-  _pBeatStates = pBeatStates;
-  _pSeq = pSeq;
-  _pPitch = pPitch;
-  _pPitchChange = pPitchChange;
-  _pScreen = pScreen;
-  _pDiv = pDiv;
-  _pSwing = pSwing;
-  //pass leds pointer to private variable
-  _ledsPointer = ledsPointer;
-  //begin I2C connection
-  //Serial.println("MCP23017 buttons running");
-  if(!mcp.begin_I2C(0x20)) {
+void Buttons::_keyRelease(BeatData *d, int num) {
+  if(seqBtnDown) {
+    d->activeSeq = num;
+    Serial.print("switched active seq to ");
+    Serial.println(num);
+    seqChanged = 1;
+    id = num;
+  }
+  else if(!encoderTurned) {
+    //turn on or off our beat :)
+    int b = !d->beatStates[d->activeSeq][num];
+    if(b) {
+      Serial.print("turned on beat no. ");
+    }
+    else { Serial.print("turned off beat no. "); }
+    Serial.println(num);
+    d->beatStates[d->activeSeq][num] = b;
+    beatChanged = 1;
+    id = num;
+  }
+}
+void Buttons::_btnHandler(int event, int param, BeatData *d) {
+  switch(event) {
+        case Events::EV_KEY_PRESS:
+          Serial.print("key pressed: ");
+          Serial.println(param);
+          //Serial.println(d->pitch[0][param]);
+          break;
+
+        case Events::EV_KEY_RELEASE:
+          Serial.print("key released: ");
+          Serial.println(param);
+          _keyRelease(d, param);
+          encoderTurned = 0;
+          break;
+
+        case Events::EV_ENCODER:
+          encoderTurned = 1;
+          break;
+    }
+}
+
+
+void Buttons::_btnManagerA() {
+  static unsigned long prevMillis = 0;
+    unsigned long currMillis;
+    int i;
+
+    currMillis = millis();
+    if (currMillis - prevMillis >= _dbDelay) {
+        prevMillis = currMillis;
+        i = mcpA.getLastInterruptPin();
+            if (!mcpA.digitalRead(i)) {    // buttons are active low
+                _btnOn[i]++;
+                _btnOff[i] = 0;
+            }
+            else {
+                _btnOn[i] = 0;
+                _btnOff[i]++;
+            }
+
+            if (_btnOn[i] >= KB_DEBOUNCE_COUNT) {
+                _btnOn[i] = 0;
+                _btnOff[i] = 0;
+                _currState[i] = 1;
+                if (_prevState[i] == 0) {
+                    // it was released and now it's pressed
+                    _prevState[i] = 1;
+                    _q->enqueueEvent(Events::EV_KEY_PRESS, i);
+                }
+            }
+
+            if (_btnOff[i] >= 1) {
+                _btnOn[i] = 0;
+                _btnOff[i] = 0;
+                _currState[i] = 0;
+                if (_prevState[i] == 1) {
+                    // it was pressed and now it's released
+                    _prevState[i] = 0;
+                    _q->enqueueEvent(Events::EV_KEY_RELEASE, i);
+                }
+            }
+
+    }
+}
+
+void Buttons::begin() {
+  //mcp
+  if(!mcpA.begin_I2C(0x20)) {
     Serial.println("MCP #1 0x20 error.");
     while (1);
   }
-  if(!mcp2.begin_I2C(0x21)) {
+  //config interrupts
+  pinMode(INT_PIN_A, INPUT);
+  mcpA.setupInterrupts(true, false, LOW);
+  //config button matrix
+  for (int i = 0; i < 16; i ++) {
+    mcpA.pinMode(i, INPUT_PULLUP);
+    mcpA.setupInterruptPin(i, LOW);
+  }
+
+  if(!mcpB.begin_I2C(0x21)) {
     Serial.println("MCP #2 0x21 error.");
     while (1);
   }
-  //configure button matrix
-  for (int i = 0; i < 16; i ++) {
-    //config pin for input pull up
-    mcp.pinMode(i, INPUT_PULLUP);
-  }
-  //set up mod buttons
-  pinMode(seqButton, INPUT);
-  //these on mcp #2
-  mcp2.pinMode(tempoDivButton, INPUT_PULLUP);
-  mcp2.pinMode(swingButton, INPUT_PULLUP);
-  mcp2.pinMode(transButton, INPUT_PULLUP);
-  //start encoder
-  enc.begin(pPitch, _pPitchChange);
-}
-//__attribute__((optimize("O0")))
-void Buttons::read(unsigned long dt) {
-  //if a button was already held, just read pitch
-  if(buttonHeld >= 0) {
-    //update encoder
-    enc.tick();
-    enc.readPitch(buttonHeld);
-    if(_pPitchChange[buttonHeld] == 1) {
-      (*_pScreen).pitch(_pPitch[buttonHeld]);
-    }
-    //also check for a button release
-    int r = mcp.digitalRead(buttonHeld);
-    if(r == LOW) {
-      //just return
-      return;
-    }
-    //we released the button, start reading buttons again
-    else { buttonHeld = -1; }
-  }
-  //if our tempo div button is down
-  else if (mcp2.digitalRead(tempoDivButton) == HIGH) {
-    //update encoder
-    enc.tick();
-    //change division according to direction
-    int div = _pDiv[*_pSeq] - enc.getDirection();
-    if(div > 0) {
-      _pDiv[*_pSeq] = div;
-      (*_pScreen).div(div);
-    }
-    return;
-  }
-  //if our swing button is down
-  else if (mcp2.digitalRead(swingButton) == HIGH) {
-    //update encoder
-    enc.tick();
-    //change division according to direction
-    float swing = _pSwing[*_pSeq] + (enc.getDirection() * 0.01f);
-    if(swing > 0.0f) {
-      _pSwing[*_pSeq] = swing;
-      (*_pScreen).swing(swing);
-    }
-    homeScreen = false;
-    return;
-  }
-  //no function buttons used (this is a bit lazy)
-  else if (!homeScreen) { (*_pScreen).home(); homeScreen = true; }
 
-  //cycle through all buttons
-  for (int i = 0; i < 16; i++) {
-    int r = mcp.digitalRead(i);
-    //if we get a new button state before debounce, reset
-    if(r != _lastButtonState[i] && _buttonHold[i] == 0) {
-      _lastdbTime[i] = 0;
+  mcpB.pinMode(seqButton, INPUT_PULLUP);
+  mcpB.pinMode(tempoDivButton, INPUT_PULLUP);
+  mcpB.pinMode(transButton, INPUT_PULLUP);
+  mcpB.pinMode(resetButton, INPUT_PULLUP);
+
+  _dispatcher->addEventListener(Events::EV_KEY_PRESS, _btnHandler);
+  _dispatcher->addEventListener(Events::EV_KEY_RELEASE, _btnHandler);
+  _dispatcher->addEventListener(Events::EV_ENCODER, _btnHandler);
+}
+
+void Buttons::read(unsigned long dt) {
+  //check if our sequence was reset
+  if(mcpB.digitalRead(resetButton)) {
+    _d->stepNumber = 0;
+    for(int i = 0; i < 8; i ++) {
+      _d->stepCounter[i] = 0;
     }
-    else { _lastdbTime[i] += dt; _lastButtonState[i] = r; } //increment timer
-    //if our debounce time has passed and it's a new state:
-    //it's a genuine press
-    if((_lastdbTime[i]) > _dbDelay) {
-      //if the state changed OR our button was already held do stuff
-      if(r != _buttonState[i] || _buttonHold[i] == 1) {
-        _buttonState[i] = r;
-        //if our SEQ button is also down, switch seq instead
-        if(digitalRead(seqButton) == LOW){
-          if(_buttonState[i] == LOW) {
-            if(i < 5) {
-              (*_pScreen).seq(i);
-              *_pSeq = i;
-              //reset LEDs
-              (*_ledsPointer).switchSequence(_pBeatStates, *_pSeq);
-            }
-          }
-          //we can skip the rest
-          return;
-        }
-        //otherwise do the usual:
-        //button down
-        else if (_buttonState[i] == LOW) {
-          //button held
-          _buttonHold[i] = 1;
-          buttonHeld = i;
-          // we can read pitch knob
-        }
-        //button up
-        else if (_buttonState[i] == HIGH) {
-          //if we changed our pitch while the button was held
-          //then don't light the LED or change beat state
-          if(_pPitchChange[i] == 1) {
-            (*_pScreen).home();
-            _pPitchChange[i] = 0;
-            _buttonHold[i] = 0;
-          }
-          else {
-            //if we didn't change the pitch then turn on beat
-            int v = !_pBeatStates[*_pSeq][i];
-            _pBeatStates[*_pSeq][i] = v;
-            (*_ledsPointer).switchState(i, _pBeatStates[*_pSeq][i]);
-            //finally set _buttonHold LOW
-            _buttonHold[i] = 0;
-          }
-        }
-      }
-    }
-    _lastButtonState[i] = r;
-    //update our leds
-    (*_ledsPointer).update();
+    Serial.println("RESET");
   }
+
+  //check if any of our mod buttons are down
+  //sequence
+  if(!mcpB.digitalRead(seqButton)) {
+    seqBtnDown = 1;
+  }
+  else { seqBtnDown = 0; }
+
+  // tempoDiv
+  if(mcpB.digitalRead(tempoDivButton)) {
+    if(!tempoDivBtnDown) {
+      _q->enqueueEvent(Events::EV_KEY_PRESS, 16);
+    }
+    tempoDivBtnDown = 1;
+  }
+  else {
+    if(tempoDivBtnDown) {
+      _q->enqueueEvent(Events::EV_KEY_RELEASE, 16);
+    }
+    tempoDivBtnDown = 0;
+  }
+
+  //transpose
+  if(mcpB.digitalRead(transButton)){
+    if(!transBtnDown) {
+      _q->enqueueEvent(Events::EV_KEY_PRESS, 18);
+    }
+    transBtnDown = 1;
+  }
+  else {
+    if(transBtnDown) {
+      _q->enqueueEvent(Events::EV_KEY_RELEASE, 18);
+    }
+    transBtnDown = 0;
+  }
+
+  // read interrupt pin for button matrix
+  if(!digitalRead(INT_PIN_A)) {
+    _btnManagerA();
+  }
+  // if a beat was changed fire event
+  if(beatChanged) {
+    _q->enqueueEvent(Events::EV_BEATCHANGED, id);
+    beatChanged = 0;
+  }
+  // if a sequence was changed fire event
+  if(seqChanged) {
+    _q->enqueueEvent(Events::EV_SEQUENCECHANGED, id);
+    seqChanged = 0;
+  }
+
+  _dispatcher->run(); // this should probably be run on main.cpp
 }

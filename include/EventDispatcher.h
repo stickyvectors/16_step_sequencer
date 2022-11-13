@@ -1,0 +1,93 @@
+#ifndef EventDispatcher_h
+
+#define EventDispatcher_h
+
+#include <Events.h>
+#include <EventQueue.h>
+#include <BeatData.h>
+
+typedef void (*EventListener)(int ev_code, int ev_param, BeatData *d);
+
+class EventDispatcher {
+
+public:
+    // maximum number of event/callback entries
+    // can be changed to save memory or allow more events to be dispatched
+    static const int MAX_LISTENERS = 40;
+
+    enum OverwriteOption { ALWAYS_APPEND, OVERWRITE_EVENT };
+
+    // the function f will be called when event ev_code will be dequeued
+    // returns true if the listener is successfully installed,
+    // false otherwise (e.g. the dispatch table is full)
+    // Overwrite options:
+    // ALWAYS_APPEND   = just add ev_code/f to the list
+    // OVERWRITE_EVENT = if a listener with the same event is found, replace its function with f
+    bool addEventListener(int ev_code, EventListener f, OverwriteOption overwrite = ALWAYS_APPEND);
+
+    // remove event listener
+    // other listeners with the same function or ev_code will not be affected
+    bool removeEventListener(int ev_code, EventListener f);
+
+    // enable or disable a listener
+    // return true if the listener was successfully enabled or disabled,
+    // false if the listener was not found
+    bool enableEventListener(int ev_code, EventListener f, bool enable);
+
+    bool isEventListenerEnabled(int ev_code, EventListener f);
+
+    // the default listener is a callback function that is called when
+    // an event with no listener is dequeued
+    bool setDefaultListener(EventListener f);
+
+    void removeDefaultListener();
+
+    void enableDefaultListener(bool enable);
+
+    // this must be continuously called (in loop())
+    void run();
+
+    // get the current number of entries in the dispatch table
+    int getNumEntries() { return numListeners; }
+
+    // get a referenct to the underlying event queue
+    EventQueue* getEventQueue() { return q; }
+
+    // a dispatcher is used to process events of a particular queue
+    EventDispatcher(BeatData *d, EventQueue* evQueue);
+
+private:
+    // event queue to be managed
+    EventQueue* q;
+    // beat data ref
+    BeatData *_d;
+
+    // actual number of event listeners
+    int numListeners;
+
+    // pointers to callback functions
+    EventListener callback[MAX_LISTENERS];
+
+    // each listener observes a specific event type
+    int eventCode[MAX_LISTENERS];
+
+    // each listener can be enabled or disabled
+    bool enabled[MAX_LISTENERS];
+
+    // callback function to be called for event types
+    // which have no listener
+    EventListener defaultCallback;
+
+    // once set, the default callback function can be enabled or disabled
+    bool defaultCallbackEnabled;
+
+    // returns the array index of the specified listener
+    // or -1 if no such event/function couple is found
+    int _searchEventListener(int ev_code, EventListener f);
+
+    int _searchEventCode(int ev_code);
+};
+
+
+
+#endif

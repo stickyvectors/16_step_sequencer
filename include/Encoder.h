@@ -2,17 +2,27 @@
 #define Encoder_h
 
 #include "Arduino.h"
+#include "BeatData.h"
+#include "EventQueue.h"
+#include "EventDispatcher.h"
 
 class Encoder
 {
-  public:
-    Encoder();
-    void begin(int* pPitch, int* pPitchChange);
-    void tick();
-    int getDirection();
-    void readPitch(int button);
-  private:
-    int* _pPitch;
-    int* _pPitchChange;
+public:
+  Encoder(BeatData *d, EventQueue *q, EventDispatcher *dispatcher);
+  void begin();
+  void read();
+  void update();
+  void updatePitch();
+  void transpose();
+  void updateTempoDiv();
+
+private:
+  BeatData *_d;
+  EventQueue *_q;
+  EventDispatcher *_dispatcher;
+
+  static void _btnHandler(int event, int param, BeatData *d);
 };
+
 #endif
