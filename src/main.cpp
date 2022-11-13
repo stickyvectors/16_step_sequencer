@@ -70,52 +70,60 @@ void setup() {
 }
 
 void loop() {
-  //calculate delta time
-  dt = millis() - lastDT;
-  tempoTimer += dt;
-  lastDT = millis();
-  //read buttons and encoder
-  buttons.read(dt);
-  encoder.read();
-
-  //update leds
-  leds.update();
-
-  //count steps every 1/64, fire tempo every 1/16
-  if(tempoTimer > tempo) {
+  //if we aren't playing anything:
+  if(!dPtr->playPause) {
+    //reset tempo timer
     tempoTimer = 0;
-    //check for beats we need to fire (LEDs are updated inside gates)
-    gates.update(dt);
-    //clock HIGH
-    if(dPtr->stepNumber % 4 == 0) {
-      digitalWrite(clkPin, HIGH);
+    //still read buttons so we can detect play
+    buttons.read(dt);
+  }
+  else {
+    //calculate delta time
+    dt = millis() - lastDT;
+    tempoTimer += dt;
+    lastDT = millis();
+    //read buttons and encoder
+    buttons.read(dt);
+    encoder.read();
+
+    //update leds
+    leds.update();
+
+    //count steps every 1/64, fire tempo every 1/16
+    if(tempoTimer > tempo) {
+      tempoTimer = 0;
+      //check for beats we need to fire (LEDs are updated inside gates)
+      gates.update(dt);
+      //clock HIGH
+      if(dPtr->stepNumber % 4 == 0) {
+        digitalWrite(clkPin, HIGH);
+      }
+      else if(dPtr->stepNumber % 4 == 1) {
+        digitalWrite(clkPin, LOW);
+      }
+      //increment our global step number (1/64)
+      dPtr->stepNumber += 1;
+      if(dPtr->stepNumber == 1024) {
+        dPtr->stepNumber = 0; //reset back to beginning after this many 1024 steps
+      }
     }
-    else if(dPtr->stepNumber % 4 == 1) {
-      digitalWrite(clkPin, LOW);
-    }
-    //increment our global step number (1/64)
-    dPtr->stepNumber += 1;
-    if(dPtr->stepNumber == 1024) {
-      dPtr->stepNumber = 0; //reset back to beginning after this many 1024 steps
+
+    tempoDb += dt;
+    if(tempoDb > tempoDbtime) {
+      //update tempo, if it got changed
+      //exponential smoothing
+      tSample = analogRead(tempoKnob)/4.3;
+      tEstimate += (tSample - tEstimate) >> 3;
+
+      if(tEstimate != tempo) {
+        tempo = tEstimate;
+        Serial.println(tempo);
+      }
+      //unsigned int tRead = analogRead(tempoKnob)/4.3;
+      //if (tRead > tempo * 1.1 || tRead < tempo * 0.9) {
+      //  tempo = tRead;
+      //}
+      tempoDb = 0;
     }
   }
-
-  tempoDb += dt;
-  if(tempoDb > tempoDbtime) {
-    //update tempo, if it got changed
-    //exponential smoothing
-    tSample = analogRead(tempoKnob)/4.3;
-    tEstimate += (tSample - tEstimate) >> 3;
-
-    if(tEstimate != tempo) {
-      tempo = tEstimate;
-      Serial.println(tempo);
-    }
-    //unsigned int tRead = analogRead(tempoKnob)/4.3;
-    //if (tRead > tempo * 1.1 || tRead < tempo * 0.9) {
-    //  tempo = tRead;
-    //}
-    tempoDb = 0;
-  }
-
 }

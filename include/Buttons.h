@@ -14,6 +14,7 @@ public:
   void read(unsigned long dt);
 
 private:
+  int startStop = 1;
   BeatData *_d;
   EventQueue *_q;
   EventDispatcher *_dispatcher;

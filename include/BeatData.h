@@ -4,6 +4,7 @@
 #include <Arduino.h>
 
 struct BeatData {
+  int playPause = 1;
   int activeSeq = 0;
   int currentBeat = 0;
   int stepNumber = 0;

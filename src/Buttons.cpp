@@ -23,6 +23,9 @@ Adafruit_MCP23X17 mcpB;
 #define transButton 10 //18
 #define seqButton 11 // N/a
 
+unsigned long playButtonDbTime = 0;
+int prevPlayButtonState = 0;
+
 int seqBtnDown = 0;
 int tempoDivBtnDown = 0;
 int transBtnDown = 0;
@@ -156,13 +159,27 @@ void Buttons::begin() {
 }
 
 void Buttons::read(unsigned long dt) {
+  //increment playbutton debounce
+  playButtonDbTime += dt;
   //check if our sequence was reset
-  if(mcpB.digitalRead(resetButton)) {
-    _d->stepNumber = 0;
-    for(int i = 0; i < 8; i ++) {
-      _d->stepCounter[i] = 0;
+  int playButtonState = mcpB.digitalRead(resetButton);
+  if(playButtonDbTime >= _dbDelay && playButtonState != prevPlayButtonState) {
+    if(playButtonState && startStop) {
+      _d->stepNumber = 0;
+      for(int i = 0; i < 8; i ++) {
+        _d->stepCounter[i] = 0;
+      }
+      _d->playPause = 0;
+      startStop = 0;
+      Serial.println("PAUSE");
     }
-    Serial.println("RESET");
+    else if(playButtonState && !startStop) {
+      _d->playPause = 1;
+      startStop = 1;
+      Serial.println("PLAY");
+    }
+    prevPlayButtonState = playButtonState;
+    playButtonDbTime = 0;
   }
 
   //check if any of our mod buttons are down
